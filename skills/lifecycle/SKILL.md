@@ -1,0 +1,147 @@
+---
+name: lifecycle
+description: How work is run in a project, from units of work, plans and status records to the work board. Use when picking up a slice or a unit, from your own plan or another's, before your first edit, when starting, continuing, handing off or closing a unit of work, an epic, a phase or a slice, when reading or updating a status record, plan, review request or Validation Pack, when recording what was learned, when preparing a commit, merge or release, and when reporting what comes next.
+---
+
+# The development lifecycle
+
+This skill's tasks span the activities delivery, planning-and-estimation, release-and-versioning, acceptance, regression-testing, continuous-integration, technical-debt-management, architecture-decision-making and documentation, and a task often needs several of them, named together and separated by commas. Read each row's flags and the line under it, where an entry's boundary, its successor and the debt against it are named.
+
+The always-on rules are in {{contract}}. This skill is the procedure behind them.
+
+## Starting a named unit of work
+
+Read, in order:
+
+1. the accepted decisions it depends on, in `{{decisions}}/`
+2. its plan, `{{plans}}/<unit>.md`
+3. its status record, `{{status}}/<unit>.md`, the one authoritative live state
+4. any open review request, `{{review}}/<unit>-review.md`
+
+Do not treat a plan as a status log.
+
+## The documents
+
+Only plans and status records are mandatory. Every unit has a plan and a status record. Every other document below is optional, and a project that keeps none of them still keeps these two. Every location is a default, and a project overrides it in its `skill_values`.
+
+| Document | Holds | Changes when |
+|---|---|---|
+| `{{sketches}}/<unit>.md` | the broad shape of an idea, its options and questions | freely. Usually deleted once a plan replaces it |
+| `{{plans}}/<unit>.md` | scope, dependencies, steps, decisions, planned validation | only when the plan changes |
+| `{{status}}/<unit>.md` | live state, next action, history | after every material action, result, blocker or handoff |
+| `{{review}}/<unit>-review.md` | the review request: scope, artefacts, exact commands, pass criteria, open questions, a link to the status record | before handoff. Closed after disposition |
+| `{{validation}}/<slice-id>.md` | a slice's Validation Pack | written with the slice, results filled at verification |
+| `{{pending}}` | design decisions that matter but cannot be made yet, with the options known | add when raised, remove naming the decision record, sketch or plan that settles it |
+| `{{debt}}` | debt with no planned home: a shortcut, a gap between a claim and the behaviour, a check that does not run | add when spotted, remove naming the plan that takes it on. Never features, follow-ups or deferred slices |
+| `{{index}}` | the generated register of every unit and every slice, written by `{{build_work}}` from the status records | never by hand. Regenerated in the same commit as the record it reads |
+
+Never create a second status record for a unit.
+
+## Recording what we learn
+
+A learning that outlives its session goes into a register in the same change that produced it, and the index is refreshed so other agents can find it. A learning left in a commit message is lost.
+
+**Update the registers and the skills of the domains, and add your project's own.** A domain's registers and skills are shared by every project that uses it, so a learning that holds beyond this project goes there and not only here. What a tool, store or platform actually does goes to the register of the domain about it, as the next row with its Evidence cell, which says what was run and on which version. A rule an agent needs to do a task well goes into the domain's skill for that task, and a rule only this project needs goes into this project's own register, or into its additions to the skill (`.vyvid/skills/<domain>/<skill>.md`). A project adds its own registers and rules to the domain's, and never works around one it disagrees with without recording why.
+
+**Which register takes it.**
+
+| What was learned | Goes in |
+|---|---|
+| what a store, tool, engine or platform actually does, found by probing or being surprised | the discovery register of the domain it is about, as the next row. Otherwise the unit's status record until a register owns it |
+| a choice made, where a decision record is warranted | a decision record, drafted as Proposed |
+| a choice that matters and cannot be made yet | `{{pending}}` |
+| a shortfall in something that exists, with no planned home | `{{debt}}` |
+| an answer the repository holds and no register entry does, found by falling back from the index | the register that should hold it, in the same change. Otherwise `{{debt}}`, and tell {{maintainer}} |
+| a rule about how we write, name, structure or check something | the skill that an agent reads for that task, not a commit message |
+| a cost measured, with numbers | the discovery record, citing the benchmark |
+
+**How to write the entry.** One bolded lead sentence stating the claim, then the detail. The index extracts that sentence as the claim and never stores a second copy, so an entry whose first sentence is a preamble indexes as a preamble. Keep it under 200 characters and state the cost as well as the benefit.
+
+**Then refresh the index.**
+
+```bash
+{{refresh_index}}
+{{check_identifiers}}
+```
+
+The first derives the index again so the entry is findable. The second fails if the entry cites an identifier that resolves to nothing, which is the commonest way a new entry is wrong.
+
+## Epics, phases, slices and milestones
+
+A project's configuration can rename these units and the words of the ladder below. These are the defaults.
+
+| Unit | Is | Ends with | Documents |
+|---|---|---|---|
+| Epic | a large package spanning phases, marked as an epic in its record | never. Only its phases end | epic plan, phase plans, epic status |
+| Phase | slices that together give a demonstrable capability | a phase gate: milestone, docs updated, decisions ratified | phase plan and status |
+| Slice | one agent work package, independently reviewable and testable | the validation gate | its Validation Pack |
+| Milestone | an end-to-end outcome in the local stack | a demo and a green end-to-end suite | the phase plan and status |
+
+No epic-level review is created until every phase plan exists and every acceptance suite passes.
+
+**Slice sizing.** More than about 15 test cases, or more than two modules touched, splits the slice. Fewer than 3 merges it. Skeleton slices, with one build smoke test, are exempt.
+
+**Every slice delivers:**
+
+1. code in one or two modules
+2. a Validation Pack with the invariant it protects (one paragraph, citing the decisions or gaps), a test table (ID, Given/When/Then, level L0 to L8, invariant, pass criterion, positive or negative), **one command** that runs everything, the artefacts to inspect, and deliberate non-coverage with the slice that covers it
+3. its row on the home unit's slice board moved to `built`, and `{{build_work}}` run, so {{index}}'s register follows
+4. the doc delta, in the same slice. No "docs later"
+
+**The validation gate.** {{maintainer_first}} reviews the Validation Pack before running anything, runs the one command and inspects the artefacts. An adversarial probe follows: {{maintainer}} names a test, or leaves the pick to the agent, and the agent breaks the implementation, shows the test fails, restores it, and records each probe and its result in the status record. {{maintainer_first}}'s merge is the sign-off. There is no separate sign-off log.
+
+**Test levels.** L0 build smoke, L1 unit, L2 property and determinism, L3 contract, L4 component integration, L5 system end-to-end, L6 UI end-to-end, L7 non-functional, L8 hostile and security. A project's configuration can replace this scale.
+
+**Non-weakening.** No slice deletes, skips or loosens an earlier slice's test without a decision-record-grade justification in its Validation Pack, countersigned at the gate.
+
+## Picking up and finishing
+
+The slice board of a unit's status record is the one place a slice's state is written, and `{{board}}` reads it from the tip of every local and remote branch. The board's shape is fixed.
+
+```markdown
+| Slice | Deliverable | State | Blocked on |
+|---|---|---|---|
+| ABC-1b.3b | aggregate bindings | building 2026-10-30, briefed 2026-10-27 | |
+| ABC-1b.4 | qualifying rules | planned | ABC-1b.3 |
+```
+
+- **A slice's state is written once, on the board of its home unit**, the unit whose plan defines it. An agent that builds a slice of one unit on another unit's branch sets the row in the home unit's record, on that branch. The adopting unit's record says so in its history and never carries a second row.
+- **Mark before you touch.** Picking up is one edit, and it is the first edit: set the row to `building <day>`, add a history line, run `{{build_work}}`, and commit the mark alone, so the board sees the claim from the first push. An agent caught editing unmarked stops, marks and commits the mark before going on. A unit or a plan picked up whole is its record's `**Status:**` line changed the same way.
+- **A state is a word of the ladder and the day it was reached.** `planned`, `briefed`, `building`, `built`, `verified`, `merged`, `tagged`, with `blocked` and `dropped` aside, dated from `building` on, newest first in the cell, so the cell is its own trail. The day is the fact written. The commit is read from git by `{{board}} --commits`, never written.
+- **A unit's state is its board's roll-up.** Where a record has a board, its `**Status:**` word and day are what the rows give: building while any row is building, dated by the earliest, else the lowest word of the rows at built or later, dated by the latest, else blocked if any row is, else the highest of planned and briefed. Dropped rows count only when every row is dropped. `{{normalise_apply}}` sets the word, and the `{{check_work}}` check refuses one that disagrees. The board shows the trunk's state and each branch further on.
+- **Handing off is one edit**, the row to `built <day>` in the commit that carries the Validation Pack's handoff. {{maintainer_first}}'s verification is `verified`, and the merge into `{{trunk}}` flips the rows it delivers to `merged <day>` in the merge commit.
+- **A slice id is `PREFIX-segment(.segment)*`**, a segment being optional capitals, digits and one lowercase letter, and the prefix declared on the unit's plan's `**Prefix:**` line. `ABC-1b.3b`, `XYZ-2.6d`, `QRS-S1` and `UV-DOC1` are ids. A slice is defined by its row, and a slice a plan names with no row fails `{{check_identifiers}}`.
+- **No plan and no status record names a branch.** The board derives the branch from where it finds the row, and plans move between branches.
+- **The register is regenerated in the same commit.** The `{{check_work}}` hook check refuses a commit whose touched records and {{index}}'s region disagree, or whose touched board is malformed, and names the task that fixes it.
+- **Before the first edit in any checkout, run `{{here}}`.** It writes your presence, `--role build`, `review` or `read` with `--model`, into the checkout's git-ignored local folder, and lists the sessions touched in the last twelve hours. Where another live session is building there, or you were asked to review, say who is here and ask {{maintainer}} before writing. A reviewer's findings go to the review request or to chat, never into a file another live session is building.
+
+Ask the board before reading branches. `{{board}}` answers where every unit and slice is, with `--all` for every row, `--fetch` to fetch every remote first, `--measure` for each branch's content share on `{{trunk}}`, and `--commits` for the commit that set each printed row. {{index}} holds the state of the tree it was built from, and `{{read}} <slice id>` prints a slice's row.
+
+## Building a slice
+
+- **Brief before branch.** A slice is briefed on `{{trunk}}` (scene, questions, each option's consequences), and {{maintainer}} answers before a branch is due. {{maintainer_first}} creates the branch, from the current `{{trunk}}`, unless they say otherwise.
+- **Examples first.** The first phase writes the examples the work must accept, and {{maintainer}} commits them. The building phase follows.
+- **Pause before commit.** The agent builds and verifies, writes the Validation Pack's handoff and results, updates the status record, and stops. {{maintainer_first}} commits.
+- **Report on the index at every handoff.** List the questions it answered weakly or not at all, the near answers and the gaps recorded while reading (`{{misses}}`). Say which entry, facet value, column or edge would have carried each, such as a Does not cover cell, a Distinguished from or Bears on id, or an addendum's Reverses lead, and add any answer the fallback found to its register in the same change. A gap is recorded with `{{gap}}` when it is found, not remembered at the end, and closed with `{{close}} <ID>` in the change that writes its signpost.
+- **Executing a whole plan autonomously.** The request is the go-ahead to author every slice, but do not ratify decision records, record each open design decision in the status record rather than choosing silently, and never report a check as passed that could not run.
+- **Estimates** are in tokens, not agent days, so they can be compared with actual cost afterwards.
+
+## Merging and releasing
+
+- **Merge before tag.** A release tag names a commit on `{{trunk}}`. The order is commit, merge into `{{trunk}}`, then tag. A tag on an unmerged branch can name a commit that never reaches `{{trunk}}`.
+- **Branch from `{{trunk}}`**, so a branch starts from every merged release, unless {{maintainer}} has said parallel work is under way.
+- **Version bumps happen once, at merge, never mid-branch.** Nobody consumes a branch's version numbers before it merges, so bumping per slice re-pins files for no reader and still has to happen again at the merge. A branch's new or changed documents keep citing the version `{{trunk}}` was pinned to at the branch point throughout the branch's life. Expect the project's version check to report a pending bump for a branch's own changed content until the actual merge-time bump, which is the correct state of a branch mid-flight, not a defect to work around.
+- **Versions on a working branch.** Where {{maintainer}} has agreed that a branch defers versioning, the branch makes no bump, its status record says so, and the version check's unbumped report is expected there. The branch writes each change's release note when it makes the change, under an Unreleased heading. The bump is made once, before the merge into `{{trunk}}`, and the tags follow the merge.
+- **Release tags are {{maintainer}}'s.** Whenever the release record gains a row, or the version check lists pending tags, end the handoff with a notice headed `{{release_notice}}`, listing each tag as a, b, c with the commands to create and push them once the change is merged. Repeat it in every handoff until the tags exist.
+- **Test suites before a merge, by convention, never in a hook.** A hook runs quick checks only. Before a branch is merged into `{{trunk}}`, run every suite the branch touched that the full check leaves out and the hooks never run, and the handoff that asks for the merge lists each with its result, or says it was not run and why. A failure on one engine or platform is recorded in the register that owns it and is fixed or accepted before the merge.
+- **The merge gate.** A merge into `{{trunk}}` runs the hooks' merge checks. Before merging on the hosting service, where no local hook runs, run {{hooks_merge}}. No hook ever blocks a push, so a branch always reaches {{maintainer}} for review.
+- Never merge, push or tag without {{maintainer}}'s go-ahead.
+
+## Reporting
+
+- A handoff lists what was built, what was run and its real result, what was not run, what to check first, and every deviation from the plan with its reason.
+- A "what next" report ends with {{plan_first}} when something must be decided first, or {{ready_to_branch}} when a new branch is actually due.
+
+## Project overrides
+
+Every location and command above is a value of the project's `skill_values`, and a project sets the ones it differs on. The names are `status`, `plans`, `sketches`, `review`, `validation`, `decisions`, `pending`, `debt`, `index`, `board`, `here`, `build_work`, `check_work`, `normalise_apply`, `refresh_index`, `check_identifiers`, `hooks_merge`, `plan_first`, `ready_to_branch`, `release_notice`, `trunk` and `maintainer`. The plan and the status record are the only two a project cannot do without, so their locations are never left unset.
